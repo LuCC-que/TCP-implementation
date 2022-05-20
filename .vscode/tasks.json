@@ -1,0 +1,32 @@
+{
+  "tasks": [
+    {
+      "type": "shell",
+      "label": "C/C++: g++ build active file",
+      "command": "/usr/bin/g++",
+      "args": [
+        "-g",
+        "${file}",
+        "-o",
+        "${fileDirname}/${fileBasenameNoExtension}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "type": "shell",
+      "label": "build project",
+      "command": "cd build && make -j8",
+      "args": []
+    }
+  ],
+  "version": "2.0.0"
+}
