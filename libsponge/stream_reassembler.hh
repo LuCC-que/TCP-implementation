@@ -4,8 +4,9 @@
 #include "byte_stream.hh"
 
 #include <cstdint>
+#include <list>
 #include <string>
-
+using namespace std;
 //! \brief A class that assembles a series of excerpts from a byte stream (possibly out of order,
 //! possibly overlapping) into an in-order byte stream.
 class StreamReassembler {
@@ -14,6 +15,35 @@ class StreamReassembler {
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
+    size_t _smallest_assembled_index = 0;
+    size_t _smallest_temporty_index = 0;
+
+    struct datagram {
+        string _data;
+        size_t index;
+        size_t size;
+        bool eof;
+
+        // operator overflow
+        bool operator>(const size_t &rhs) const { return this->index > rhs; }
+        bool operator>=(const size_t &rhs) const { return this->index >= rhs; }
+        bool operator<(const size_t &rhs) const { return this->index < rhs; }
+        bool operator==(const size_t &rhs) const { return this->index == rhs; }
+        size_t operator-(const datagram &rhs) const { return this->index - rhs.index; };
+
+        datagram &operator=(datagram &rhs) {
+            this->index = rhs.index;
+            this->size = rhs.size;
+            this->_data = rhs._data;
+            this->eof = rhs.eof;
+
+            delete &rhs;
+            return *this;
+        }
+    };
+
+    list<datagram> assembled_data_list;
+    list<datagram> temporay_data_list;
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
@@ -46,6 +76,9 @@ class StreamReassembler {
     //! \brief Is the internal state empty (other than the output stream)?
     //! \returns `true` if no substrings are waiting to be assembled
     bool empty() const;
+
+    void missing_middle_handler(datagram dg);
+    void overlap_handler(datagram new_dg);
 };
 
 #endif  // SPONGE_LIBSPONGE_STREAM_REASSEMBLER_HH
