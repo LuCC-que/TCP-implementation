@@ -104,7 +104,7 @@ struct UnassembledBytes : public ReassemblerExpectation {
 };
 
 struct AtEof : public ReassemblerExpectation {
-    AtEof() {}
+    AtEof() {}  // constructor
     std::string description() const {
         std::ostringstream ss;
         ss << "at EOF";
