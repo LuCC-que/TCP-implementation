@@ -18,8 +18,8 @@ ByteStream::ByteStream(const size_t capacity) : _capacity{capacity} {}
 
 size_t ByteStream::write(const string &data) {
     size_t remaining_capacity = _capacity - _buffer_size;
-    if (remaining_capacity <= 0) {
-        return 0;  // no _capacity left
+    if (!remaining_capacity || !data.length()) {
+        return 0;  // not thing wrote in
     }
 
     size_t writeable_size = data.length() > remaining_capacity ? remaining_capacity : data.length();
@@ -54,6 +54,9 @@ void ByteStream::pop_output(const size_t len) {
 //! \param[in] len bytes will be popped and returned
 //! \returns a string
 std::string ByteStream::read(const size_t len) {
+    if (!len) {
+        return "";
+    }
     const string read = peek_output(len);
     pop_output(len);
     return read;
