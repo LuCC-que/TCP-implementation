@@ -15,17 +15,21 @@ void DUMMY_CODE(Targs &&.../* unused */) {}
 using namespace std;
 
 StreamReassembler::StreamReassembler(const size_t capacity)
-    : _output(capacity), _capacity(capacity), assembled_data_list(), temporay_data_list() {}
+    : _output(capacity), _capacity(capacity), temporay_data_list() {}
 
 //! \details This function accepts a substring (aka a segment) of bytes,
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
     bool data_exceeded = false;
+    size_t re_cap = _output.remaining_capacity();
+    if (!re_cap) {
+        return;
+    }
     if (index == _smallest_assembled_index) {
         // good case
         // assembled_data_list.push_back(dg);
-        _smallest_assembled_index += data.length();
+        _smallest_assembled_index += data.length() > re_cap ? re_cap : data.length();
         _output.write(data);
 
     }
@@ -44,6 +48,7 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
         }
         // skip the repeating case
     }
+
     bool gap_fixed = _smallest_assembled_index >= _smallest_temporty_index;
     bool data_exists_and_not_empty_list = data.length() && temporay_data_list.size();
 
@@ -59,72 +64,86 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
 }
 
 void StreamReassembler::missing_middle_handler(datagram dg) {
-    bool overlap = false;
+    // bool overlap = false;
 
     if (temporay_data_list.size() > 0) {
         list<datagram>::iterator ptr = temporay_data_list.begin();
         for (; ptr != temporay_data_list.end(); ++ptr) {
-            if (dg > *ptr) {
-                size_t covered = ptr->index + ptr->size;
-                if (dg.index + dg.size <= covered) {
-                    // front overlap
-                    _unassembled_bytes -= ptr->size;
-                    temporay_data_list.erase(ptr);
-                    _unassembled_bytes += dg.size;
-                    temporay_data_list.push_back(dg);
-                    overlap = true;
+            size_t ptr_tail = ptr->index + ptr->size;
+            size_t dg_tail = dg.size + dg.index;
+            if (dg == *ptr && ptr_tail == dg_tail) {
+                continue;
+            }
+
+            if (dg > *ptr && dg < ptr_tail) {
+                if (dg_tail <= ptr_tail) {
+                    // repeating case
+                    // ptr: *****
+                    //  dg:   ***
+
+                    // overlap = true;
+                    return;
 
                 } else {
-                    _unassembled_bytes += overlap_merger(*ptr, dg);
-                    overlap = true;
+                    // overlap
+                    //  ptr: *****
+                    //   dg:   ****
+                    overlap_merger(*ptr, dg);
+                    dg = ptr;
+                    _unassembled_bytes -= ptr->size;
+                    temporay_data_list.erase(ptr);
+                    ptr = --temporay_data_list.begin();
+                    // overlap = true;
                 }
-            } else if (dg < *ptr) {
-                size_t covered = dg.size + dg.index;
+            } else if (dg < *ptr && *ptr < dg_tail) {
+                if (ptr_tail <= dg_tail) {
+                    // replace case
+                    // ptr:  ***
+                    //  dg: ******
 
-                if (covered <= ptr->index + ptr->size) {
-                    // latter overlap
+                    _unassembled_bytes -= ptr->size;
+                    temporay_data_list.erase(ptr);
 
-                    _unassembled_bytes += overlap_merger(dg, *ptr);
-                    overlap = true;
+                    // _unassembled_bytes += dg.size;
+                    // temporay_data_list.push_back(dg);
+
+                    // overlap = true;
+                } else {
+                    // merge case:
+                    //  ptr:   ******
+                    //   dg: ******
+                    overlap_merger(dg, *ptr);
+                    _unassembled_bytes -= ptr->size;
+                    temporay_data_list.erase(ptr);
+
+                    // temporay_data_list.push_back(dg);
+
+                    // overlap = true;
                 }
 
-            } else {
+                if (!temporay_data_list.size()) {
+                    break;
+                }
+                ptr = --temporay_data_list.begin();  // may effect other
+
+            } else if (dg == *ptr) {
                 if (dg.size > ptr->size) {
                     _unassembled_bytes -= ptr->size;
                     temporay_data_list.erase(ptr);
-                    _unassembled_bytes += dg.size;
-                    temporay_data_list.push_back(dg);
-                    overlap = true;
+                    // temporay_data_list.push_back(dg);
+                    // overlap = true;
                 }
+                if (!temporay_data_list.size()) {
+                    break;
+                }
+
+                ptr = --temporay_data_list.begin();
             }
         }
-        // } else if (temporay_data_list.size() == 1) {
-        //     datagram dg_temp = *temporay_data_list.begin();
-        //     if (dg == dg_temp && dg.size > dg_temp.size) {
-        //         overlap = true;
-        //         temporay_data_list.pop_back();
-        //         temporay_data_list.push_back(dg);
-        //         _unassembled_bytes += dg.size - dg_temp.size;
-        //     } else if (dg > dg_temp) {
-        //         if (dg < dg_temp.index + dg_temp.size) {
-        //             overlap = true;
-        //             temporay_data_list.pop_back();
-        //             _unassembled_bytes += overlap_merger(dg_temp, dg);
-        //             temporay_data_list.push_back(dg_temp);
-        //         }
-        //     } else {
-        //         if (dg_temp < dg.index + dg.size) {
-        //             overlap = true;
-        //             temporay_data_list.pop_back();
-        //             _unassembled_bytes += overlap_merger(dg, dg_temp);
-        //             temporay_data_list.push_back(dg);
-        //         }
-        //     }
     }
-    if (!overlap) {
-        temporay_data_list.push_front(dg);
-        _unassembled_bytes += dg.size;
-    }
+
+    temporay_data_list.push_front(dg);
+    _unassembled_bytes += dg.size;
     temporay_data_list.sort([](const datagram a, const datagram b) { return a.index < b.index; });
 
     _smallest_temporty_index = temporay_data_list.begin()->index;

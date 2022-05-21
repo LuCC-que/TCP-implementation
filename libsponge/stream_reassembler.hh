@@ -47,9 +47,16 @@ class StreamReassembler {
             delete &rhs;
             return *this;
         }
-    };
 
-    list<datagram> assembled_data_list;
+        datagram &operator=(list<datagram>::iterator rhs) {
+            this->index = rhs->index;
+            this->size = rhs->size;
+            this->_data = rhs->_data;
+            this->eof = rhs->eof;
+
+            return *this;
+        }
+    };
     list<datagram> temporay_data_list;
 
   public:
