@@ -15,7 +15,7 @@ void DUMMY_CODE(Targs &&.../* unused */) {}
 using namespace std;
 
 StreamReassembler::StreamReassembler(const size_t capacity)
-    : _output(capacity), _capacity(capacity), temporay_data_list() {}
+    : _output(capacity), _capacity(capacity), temporarily_descrete_data_storage() {}
 
 //! \details This function accepts a substring (aka a segment) of bytes,
 //! possibly out-of-order, from the logical stream, and assembles any newly
@@ -26,10 +26,10 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     if (!re_cap) {
         return;
     }
-    if (index == _smallest_assembled_index) {
+    if (index == _next_assembling_index) {
         // good case
         // assembled_data_list.push_back(dg);
-        _smallest_assembled_index += data.length() > re_cap ? re_cap : data.length();
+        _next_assembling_index += data.length() > re_cap ? re_cap : data.length();
         _output.write(data);
 
     }
@@ -37,27 +37,28 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     else {
         datagram dg{data, index, data.length(), eof};
         // missing_middle_handler
-        if (index > _smallest_assembled_index) {
+        if (index > _next_assembling_index) {
             missing_middle_handler(dg);
             return;
 
         }
         // overlap
-        else if (index + data.length() > _smallest_assembled_index) {
+        else if (index + data.length() > _next_assembling_index) {
             data_exceeded = overlap_handler(dg);
         }
         // skip the repeating case
     }
 
-    bool gap_fixed = _smallest_assembled_index >= _smallest_temporty_index;
-    bool data_exists_and_not_empty_list = data.length() && temporay_data_list.size();
+    bool gap_fixed = _next_assembling_index >= _smallest_temporty_index;
+    bool data_exists_and_not_empty_list = data.length() && temporarily_descrete_data_storage.size();
 
     if (gap_fixed && data_exists_and_not_empty_list) {
-        datagram write_in_data = temporay_data_list.front();
-        temporay_data_list.pop_front();
+        datagram write_in_data = temporarily_descrete_data_storage.front();
+        temporarily_descrete_data_storage.pop_front();
         _unassembled_bytes -= write_in_data.size;
         StreamReassembler::push_substring(write_in_data._data, write_in_data.index, write_in_data.eof);
     }
+
     if (eof && !data_exceeded) {
         _output.end_input();
     }
@@ -66,9 +67,9 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
 void StreamReassembler::missing_middle_handler(datagram dg) {
     // bool overlap = false;
 
-    if (temporay_data_list.size() > 0) {
-        list<datagram>::iterator ptr = temporay_data_list.begin();
-        for (; ptr != temporay_data_list.end(); ++ptr) {
+    if (temporarily_descrete_data_storage.size() > 0) {
+        list<datagram>::iterator ptr = temporarily_descrete_data_storage.begin();
+        for (; ptr != temporarily_descrete_data_storage.end(); ++ptr) {
             size_t ptr_tail = ptr->index + ptr->size;
             size_t dg_tail = dg.size + dg.index;
             if (dg == *ptr && ptr_tail == dg_tail) {
@@ -91,8 +92,8 @@ void StreamReassembler::missing_middle_handler(datagram dg) {
                     overlap_merger(*ptr, dg);
                     dg = ptr;
                     _unassembled_bytes -= ptr->size;
-                    temporay_data_list.erase(ptr);
-                    ptr = --temporay_data_list.begin();
+                    temporarily_descrete_data_storage.erase(ptr);
+                    ptr = --temporarily_descrete_data_storage.begin();
                     // overlap = true;
                 }
             } else if (dg < *ptr && *ptr < dg_tail) {
@@ -102,7 +103,7 @@ void StreamReassembler::missing_middle_handler(datagram dg) {
                     //  dg: ******
 
                     _unassembled_bytes -= ptr->size;
-                    temporay_data_list.erase(ptr);
+                    temporarily_descrete_data_storage.erase(ptr);
 
                     // _unassembled_bytes += dg.size;
                     // temporay_data_list.push_back(dg);
@@ -114,39 +115,39 @@ void StreamReassembler::missing_middle_handler(datagram dg) {
                     //   dg: ******
                     overlap_merger(dg, *ptr);
                     _unassembled_bytes -= ptr->size;
-                    temporay_data_list.erase(ptr);
+                    temporarily_descrete_data_storage.erase(ptr);
 
                     // temporay_data_list.push_back(dg);
 
                     // overlap = true;
                 }
 
-                if (!temporay_data_list.size()) {
+                if (!temporarily_descrete_data_storage.size()) {
                     break;
                 }
-                ptr = --temporay_data_list.begin();  // may effect other
+                ptr = --temporarily_descrete_data_storage.begin();  // may effect other
 
             } else if (dg == *ptr) {
                 if (dg.size > ptr->size) {
                     _unassembled_bytes -= ptr->size;
-                    temporay_data_list.erase(ptr);
+                    temporarily_descrete_data_storage.erase(ptr);
                     // temporay_data_list.push_back(dg);
                     // overlap = true;
                 }
-                if (!temporay_data_list.size()) {
+                if (!temporarily_descrete_data_storage.size()) {
                     break;
                 }
 
-                ptr = --temporay_data_list.begin();
+                ptr = --temporarily_descrete_data_storage.begin();
             }
         }
     }
 
-    temporay_data_list.push_front(dg);
+    temporarily_descrete_data_storage.push_front(dg);
     _unassembled_bytes += dg.size;
-    temporay_data_list.sort([](const datagram a, const datagram b) { return a.index < b.index; });
+    temporarily_descrete_data_storage.sort([](const datagram a, const datagram b) { return a.index < b.index; });
 
-    _smallest_temporty_index = temporay_data_list.begin()->index;
+    _smallest_temporty_index = temporarily_descrete_data_storage.begin()->index;
 }
 
 size_t StreamReassembler::overlap_merger(datagram &dg1, datagram &dg2) {
@@ -164,14 +165,14 @@ size_t StreamReassembler::overlap_merger(datagram &dg1, datagram &dg2) {
 }
 
 bool StreamReassembler::overlap_handler(datagram new_dg) {
-    size_t start_at = _smallest_assembled_index - new_dg.index;
+    size_t start_at = _next_assembling_index - new_dg.index;
     string::iterator ptr = new_dg._data.begin();
     advance(ptr, start_at);
     string non_overlap_part(ptr, new_dg._data.end());
     _output.write(non_overlap_part);
-    _smallest_assembled_index += non_overlap_part.length();
+    _next_assembling_index += non_overlap_part.length();
 
-    return _smallest_assembled_index > _output.bytes_written();
+    return _next_assembling_index > _output.bytes_written();
 }
 
 size_t StreamReassembler::unassembled_bytes() const { return _unassembled_bytes; }
