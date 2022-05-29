@@ -7,6 +7,7 @@
 #include "wrapping_integers.hh"
 
 #include <functional>
+#include <list>
 #include <queue>
 
 //! \brief The "sender" part of a TCP implementation.
@@ -22,15 +23,20 @@ class TCPSender {
 
     //! outbound queue of segments that the TCPSender wants sent
     std::queue<TCPSegment> _segments_out{};
+    std::list<TCPSegment> _outstanding_segments_out{};
 
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
+    unsigned int _last_sent_segment_time = 0;
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+    WrappingInt32 confirm_seqno = wrap(0, _isn);
+    uint16_t reciever_window_size{0};
+    uint16_t reciever_logical_window_size{0};
 
   public:
     //! Initialize a TCPSender
@@ -66,7 +72,7 @@ class TCPSender {
     //! \brief How many sequence numbers are occupied by segments sent but not yet acknowledged?
     //! \note count is in "sequence space," i.e. SYN and FIN each count for one byte
     //! (see TCPSegment::length_in_sequence_space())
-    size_t bytes_in_flight() const;
+    size_t bytes_in_flight() const { return _outstanding_segments_out.size(); }
 
     //! \brief Number of consecutive retransmissions that have occurred in a row
     unsigned int consecutive_retransmissions() const;
@@ -76,6 +82,7 @@ class TCPSender {
     //! which will need to fill in the fields that are set by the TCPReceiver
     //! (ackno and window size) before sending.
     std::queue<TCPSegment> &segments_out() { return _segments_out; }
+
     //!@}
 
     //! \name What is the next sequence number? (used for testing)
@@ -87,6 +94,10 @@ class TCPSender {
     //! \brief relative seqno for the next byte to be sent
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
+
+    void send_TCPSegment(TCPSegment &_seg, bool outstanding = false);
+
+    void confirm_outstanding_seg();
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
