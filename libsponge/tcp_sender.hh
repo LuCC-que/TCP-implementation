@@ -37,6 +37,7 @@ class TCPSender {
     WrappingInt32 confirm_seqno = wrap(0, _isn);
     uint16_t reciever_window_size{0};
     uint16_t reciever_logical_window_size{0};
+    size_t _bytes_in_flight = 0;
 
   public:
     //! Initialize a TCPSender
@@ -72,7 +73,7 @@ class TCPSender {
     //! \brief How many sequence numbers are occupied by segments sent but not yet acknowledged?
     //! \note count is in "sequence space," i.e. SYN and FIN each count for one byte
     //! (see TCPSegment::length_in_sequence_space())
-    size_t bytes_in_flight() const { return _outstanding_segments_out.size(); }
+    size_t bytes_in_flight() const { return _bytes_in_flight; }
 
     //! \brief Number of consecutive retransmissions that have occurred in a row
     unsigned int consecutive_retransmissions() const;
