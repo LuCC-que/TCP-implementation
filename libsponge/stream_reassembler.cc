@@ -72,8 +72,14 @@ void StreamReassembler::missing_middle_handler(datagram dg) {
         for (; ptr != temporarily_descrete_data_storage.end(); ++ptr) {
             size_t ptr_tail = ptr->index + ptr->size;
             size_t dg_tail = dg.size + dg.index;
+
             if (dg == *ptr && ptr_tail == dg_tail) {
-                continue;
+                return;
+            }
+
+            if (dg > *ptr && dg_tail > ptr_tail) {
+                // discreate
+                break;
             }
 
             if (dg > *ptr && dg < ptr_tail) {
@@ -88,7 +94,7 @@ void StreamReassembler::missing_middle_handler(datagram dg) {
                 } else {
                     // overlap
                     //  ptr: *****
-                    //   dg:   ****
+                    //   dg:   ******
                     overlap_merger(*ptr, dg);
                     dg = ptr;
                     _unassembled_bytes -= ptr->size;
