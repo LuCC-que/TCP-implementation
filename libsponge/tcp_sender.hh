@@ -105,7 +105,7 @@ class TCPSender {
 
     void send_fin_seg();
 
-    size_t front_outstanding_seg_size() {
+    size_t front_outstanding_seg_size() const {
         TCPSegment temp = _outstanding_segments_out.front();
         size_t result = temp.payload().size();
 
