@@ -42,37 +42,31 @@ void TCPSender::fill_window() {
         return;
     }
 
-    if (stream_in().input_ended() && _stream.eof()) {
+    if (stream_in().input_ended() && _stream.eof() && !_fin_sent) {
         send_fin_seg();
         return;
     }
 
-    if (!_stream.buffer_empty()) {
-        while (reciever_logical_window_size) {
-            TCPSegment seg;
-            size_t payload_size = min({_stream.buffer_size(),
-                                       static_cast<size_t>(reciever_logical_window_size),
-                                       static_cast<size_t>(TCPConfig::MAX_PAYLOAD_SIZE)});
+    while (!_stream.buffer_empty() && reciever_logical_window_size && !_fin_sent) {
+        TCPSegment seg;
+        size_t payload_size = min({_stream.buffer_size(),
+                                   static_cast<size_t>(reciever_logical_window_size),
+                                   static_cast<size_t>(TCPConfig::MAX_PAYLOAD_SIZE)});
 
-            seg.payload() = _stream.read(payload_size);
-            bool contain_fin = _stream.eof() && payload_size + 1 <= reciever_logical_window_size;
-            seg.header().fin = contain_fin;
+        seg.payload() = _stream.read(payload_size);
+        bool contain_fin = _stream.eof() && payload_size + 1 <= reciever_logical_window_size;
+        seg.header().fin = contain_fin;
 
-            send_TCPSegment(seg);
-            if (contain_fin) {
-                _fin_sent = true;
-                --reciever_logical_window_size;
-                ++_next_seqno;
-                ++_bytes_in_flight;
-            }
-
-            _next_seqno += payload_size;
-            reciever_logical_window_size -= payload_size;
-
-            if (_stream.buffer_empty() || seg.header().fin) {
-                break;
-            }
+        send_TCPSegment(seg);
+        if (contain_fin) {
+            _fin_sent = true;
+            --reciever_logical_window_size;
+            ++_next_seqno;
+            ++_bytes_in_flight;
         }
+
+        _next_seqno += payload_size;
+        reciever_logical_window_size -= payload_size;
     }
 }
 
@@ -92,20 +86,23 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     }
 
     int size_c = static_cast<int>(front_outstanding_seg_size());
+    int gap = ackno - confirm_seqno;
 
-    bool invalid_cases = (ackno - confirm_seqno) > static_cast<int>(_bytes_in_flight) || ackno - confirm_seqno < size_c;
+    bool invalid_cases = gap > static_cast<int>(_bytes_in_flight) || gap < size_c;
 
     if (invalid_cases) {
         // wrong ack
         // ackno - confirm_seqno - _bytes_in_flight is the impossible gap
         // in between ackno and sent bytes
 
+        // if gap smaller than the first outstanding seg size, then it is outdated
+
         reciever_logical_window_size = 0;
 
         return;
     }
 
-    if (stream_in().input_ended()) {
+    if (stream_in().input_ended() && !_fin_sent) {
         // input has stop
         // if not more string to send then send a fin seg
 
@@ -171,9 +168,6 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
 void TCPSender::send_empty_segment() {}
 
 void TCPSender::send_fin_seg() {
-    if (_fin_sent) {
-        return;
-    }
     TCPSegment seg;
     seg.header().fin = true;
     send_TCPSegment(seg);
