@@ -33,8 +33,8 @@ void TCPSender::fill_window() {
         TCPSegment seg;
         seg.header().syn = true;
         send_TCPSegment(seg);
-        ++_next_seqno;
-        ++_bytes_in_flight;
+        // ++_next_seqno;
+        // ++_bytes_in_flight;
         return;
     }
 
@@ -56,17 +56,11 @@ void TCPSender::fill_window() {
         seg.payload() = _stream.read(payload_size);
         bool contain_fin = _stream.eof() && payload_size + 1 <= reciever_logical_window_size;
         seg.header().fin = contain_fin;
-
         send_TCPSegment(seg);
-        if (contain_fin) {
-            _fin_sent = true;
-            --reciever_logical_window_size;
-            ++_next_seqno;
-            ++_bytes_in_flight;
-        }
 
-        _next_seqno += payload_size;
-        reciever_logical_window_size -= payload_size;
+        if (contain_fin) {
+            _fin_sent = contain_fin;
+        }
     }
 }
 
@@ -144,7 +138,6 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
     }
 
     list<TCPSegment>::iterator it = _outstanding_segments_out.begin();
-    // advance(it, _next_resent_index);
     list<TCPSegment>::iterator first_sent = it;
     temp -= _last_tick_time;
 
@@ -165,38 +158,39 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
     }
 }
 
-void TCPSender::send_empty_segment() {}
+void TCPSender::send_empty_segment() {
+    TCPSegment seg;
+    send_TCPSegment(seg, true);
+}
 
 void TCPSender::send_fin_seg() {
     TCPSegment seg;
     seg.header().fin = true;
     send_TCPSegment(seg);
-    ++_next_seqno;
-    ++_bytes_in_flight;
-    --reciever_logical_window_size;
+
     _fin_sent = true;
 }
 
-void TCPSender::send_TCPSegment(TCPSegment &_seg, bool &&outstanding, bool &&resend) {
+void TCPSender::send_TCPSegment(TCPSegment &_seg, const bool &&outstanding, const bool &&resend) {
     if (!resend) {
         _seg.header().seqno = next_seqno();
     }
     _segments_out.push(_seg);
+    size_t _seg_len = _seg.length_in_sequence_space();
     if (!outstanding) {
         _outstanding_segments_out.push_back(_seg);
-        _bytes_in_flight += _seg.payload().size();
+        _bytes_in_flight += _seg_len;
+        _next_seqno += _seg_len;
+    }
+    if (reciever_logical_window_size) {
+        reciever_logical_window_size -= _seg_len;
     }
 }
 
 void TCPSender::confirm_outstanding_seg() {
     TCPSegment temp = _outstanding_segments_out.front();
-    size_t payload_size = temp.payload().size();
-    confirm_seqno = confirm_seqno + payload_size;
-    _bytes_in_flight -= payload_size;
-    if (temp.header().fin || temp.header().syn) {
-        confirm_seqno = confirm_seqno + 1;
-        --_bytes_in_flight;
-    }
+    confirm_seqno = confirm_seqno + temp.length_in_sequence_space();
+    _bytes_in_flight -= temp.length_in_sequence_space();
 
     _outstanding_segments_out.pop_front();
 }

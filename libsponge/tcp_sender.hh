@@ -60,9 +60,6 @@ class TCPSender {
     //! \brief A new acknowledgment was received
     void ack_received(const WrappingInt32 ackno, const uint16_t window_size);
 
-    //! \brief Generate an empty-payload segment (useful for creating empty ACK segments)
-    void send_empty_segment();
-
     //! \brief create and send segments to fill as much of the window as possible
     void fill_window();
 
@@ -99,26 +96,24 @@ class TCPSender {
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
 
-    void send_TCPSegment(TCPSegment &_seg, bool &&outstanding = false, bool &&resend = false);
+    void send_TCPSegment(TCPSegment &_seg, const bool &&outstanding = false, const bool &&resend = false);
+
+    //! \brief Generate an empty-payload segment (useful for creating empty ACK segments)
+    void send_empty_segment();
 
     void confirm_outstanding_seg();
 
     void send_fin_seg();
 
-    size_t front_outstanding_seg_size() const {
-        TCPSegment temp = _outstanding_segments_out.front();
-        size_t result = temp.payload().size();
-
-        if (temp.header().syn) {
-            result++;
-        }
-
-        if (temp.header().fin) {
-            result++;
-        }
-
-        return result;
+    TCPSegment read_a_segment() {
+        TCPSegment temp = _segments_out.front();
+        _segments_out.pop();
+        return temp;
     }
+
+    bool is_empty() const { return _segments_out.empty(); };
+
+    size_t front_outstanding_seg_size() const { return _outstanding_segments_out.front().length_in_sequence_space(); }
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH

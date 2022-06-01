@@ -15,9 +15,8 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     TCPHeader TCPHeader = seg.header();
     WrappingInt32 seg_seqno = TCPHeader.seqno;
 
-    bool segment_before_SYN = first_segment && !TCPHeader.syn;
-
-    if (segment_before_SYN) {
+    if (first_segment && !TCPHeader.syn) {
+        // received segment_before_SYN
         return;
     }
 
@@ -28,12 +27,11 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     // bool not_first_seg_and_with_data = !first_segment && !data.length();
     uint64_t temp_abs_seqno = unwrap(seg_seqno, ISN, abs_seqno);
 
-    // the syn have to take a index
-    // the second seg cant not occupy that
-    // otherwise it is invalid
-    bool invalid_stream = (abs_seqno == 1) && (temp_abs_seqno < abs_seqno);
-
-    if (invalid_stream) {
+    if (((abs_seqno == 1) && (temp_abs_seqno < abs_seqno)) ||
+        ((temp_abs_seqno > abs_seqno) && (temp_abs_seqno - abs_seqno) > _capacity)) {
+        // the syn have to take a index
+        // the second seg cant not occupy that
+        // otherwise it is invalid
         return;
     }
 
