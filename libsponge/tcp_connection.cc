@@ -22,13 +22,6 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         return;
     }
 
-    // if (_receiver.ackno().has_value() && (seg.length_in_sequence_space() == 0) &&
-    //     seg.header().seqno == _receiver.ackno().value() - 1) {
-    //     _sender.send_empty_segment();
-    //     send_segments_out();
-    //     return;
-    // }
-
     _receiver.segment_received(seg);
 
     if (check_inbound_ended() && !_sender.stream_in().eof()) {
@@ -37,8 +30,9 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 
     if (seg.header().ack) {
         // received ACK
+        // size_t temp = _sender.next_seqno_absolute();
         _sender.ack_received(seg.header().ackno, seg.header().win);
-        _sender.fill_window();
+        // _sender.fill_window();
         send_segments_out();
     }
 
@@ -70,6 +64,10 @@ void TCPConnection::tick(const size_t ms_since_last_tick) {
     send_segments_out();
 
     if (_sender.consecutive_retransmissions() > _cfg.MAX_RETX_ATTEMPTS) {
+        while (_segments_out.size()) {
+            _segments_out.pop();
+        }
+
         _sender.send_empty_segment();
         TCPSegment seg = _sender.read_a_segment();
         seg.header().rst = true;
@@ -97,14 +95,6 @@ bool TCPConnection::send_segments_out() {
     return has_sent;
 }
 
-size_t TCPConnection::remaining_outbound_capacity() const { return _sender.stream_in().remaining_capacity(); }
-
-size_t TCPConnection::bytes_in_flight() const { return _sender.bytes_in_flight(); }
-
-size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_bytes(); }
-
-size_t TCPConnection::time_since_last_segment_received() const { return _last_tick_time; }
-
 void TCPConnection::end_input_stream() {
     _sender.stream_in().end_input();
     _sender.fill_window();
@@ -122,8 +112,21 @@ TCPConnection::~TCPConnection() {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
 
             // Your code here: need to send a RST segment to the peer
+            _sender.send_empty_segment();
+            TCPSegment seg = _sender.read_a_segment();
+            seg.header().rst = true;
+            _segments_out.push(seg);
+            segment_received(seg);
         }
     } catch (const exception &e) {
         std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
     }
 }
+
+size_t TCPConnection::remaining_outbound_capacity() const { return _sender.stream_in().remaining_capacity(); }
+
+size_t TCPConnection::bytes_in_flight() const { return _sender.bytes_in_flight(); }
+
+size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_bytes(); }
+
+size_t TCPConnection::time_since_last_segment_received() const { return _last_tick_time; }

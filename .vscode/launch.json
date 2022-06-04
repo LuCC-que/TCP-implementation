@@ -47,6 +47,28 @@
             "miDebuggerPath": "/usr/bin/gdb"
         },
         {
+            "name": "debug benchMark",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/apps/tcp_benchmark",
+            "args": ["cs144.keithw.org", "/hello"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            // "preLaunchTask": "C/C++: g++ build active file",
+            "preLaunchTask": "build project",
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
             "name": "debug current file",
             "type": "cppdbg",
             "request": "launch",

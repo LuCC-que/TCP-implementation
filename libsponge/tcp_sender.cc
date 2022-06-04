@@ -70,6 +70,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     reciever_window_size = window_size;
     reciever_logical_window_size = window_size;
     // bool initial_case = _next_seqno == 1 && confirm_seqno == _isn;
+    // last_case_invalid = false;
 
     if (confirm_seqno >= ackno) {
         return;
@@ -120,6 +121,10 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
             confirm_outstanding_seg();
         }
     }
+
+    if (reciever_logical_window_size) {
+        fill_window();
+    }
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
@@ -156,6 +161,7 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
     if (reciever_window_size || _next_seqno == 1) {
         _applying_retransmission_timeout *= 2;
     }
+    _last_tick_time = 0;
 }
 
 void TCPSender::send_empty_segment() {
@@ -191,6 +197,5 @@ void TCPSender::confirm_outstanding_seg() {
     TCPSegment temp = _outstanding_segments_out.front();
     confirm_seqno = confirm_seqno + temp.length_in_sequence_space();
     _bytes_in_flight -= temp.length_in_sequence_space();
-
     _outstanding_segments_out.pop_front();
 }

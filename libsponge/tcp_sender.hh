@@ -30,6 +30,7 @@ class TCPSender {
     unsigned int _applying_retransmission_timeout = 0;
     size_t _last_tick_time = 0;
     bool _fin_sent = false;
+    bool last_case_invalid = false;
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
@@ -111,9 +112,15 @@ class TCPSender {
         return temp;
     }
 
-    bool is_empty() const { return _segments_out.empty(); };
+    bool is_empty() const { return _segments_out.empty(); }
+    bool last_case_status() const { return last_case_invalid; }
 
-    size_t front_outstanding_seg_size() const { return _outstanding_segments_out.front().length_in_sequence_space(); }
+    size_t front_outstanding_seg_size() const {
+        if (!_outstanding_segments_out.size()) {
+            return 0;
+        }
+        return _outstanding_segments_out.front().length_in_sequence_space();
+    }
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
