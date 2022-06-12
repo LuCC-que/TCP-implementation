@@ -20,6 +20,9 @@ class TCPConnection {
     //! for 10 * _cfg.rt_timeout milliseconds after both streams have ended,
     //! in case the remote TCPConnection doesn't know we've received its whole stream?
     bool _linger_after_streams_finish{true};
+    bool _active = true;
+
+    size_t _last_tick_time = 0;
 
   public:
     //! \name "Input" interface for the writer
@@ -38,6 +41,15 @@ class TCPConnection {
     //! \brief Shut down the outbound byte stream (still allows reading incoming data)
     void end_input_stream();
     //!@}
+
+    bool check_inbound_ended() const {
+        return _receiver.unassembled_bytes() == 0 && _receiver.stream_out().input_ended();
+    }
+
+    bool check_outbound_ended() const {
+        return _sender.stream_in().eof() && _sender.next_seqno_absolute() == _sender.stream_in().bytes_written() + 2 &&
+               _sender.bytes_in_flight() == 0;
+    }
 
     //! \name "Output" interface for the reader
     //!@{
@@ -65,6 +77,8 @@ class TCPConnection {
     //! Called when a new segment has been received from the network
     void segment_received(const TCPSegment &seg);
 
+    bool send_segments_out();
+
     //! Called periodically when time elapses
     void tick(const size_t ms_since_last_tick);
 
@@ -77,7 +91,7 @@ class TCPConnection {
     //! \brief Is the connection still alive in any way?
     //! \returns `true` if either stream is still running or if the TCPConnection is lingering
     //! after both streams have finished (e.g. to ACK retransmissions from the peer)
-    bool active() const;
+    bool active() const { return _active; };
     //!@}
 
     //! Construct a new connection from a configuration

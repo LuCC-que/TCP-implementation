@@ -27,7 +27,24 @@ WrappingInt32 wrap(uint64_t n, WrappingInt32 isn) { return isn + static_cast<uin
 //! has a different ISN.
 uint64_t unwrap(WrappingInt32 n, WrappingInt32 isn, uint64_t checkpoint) {
     // they should have the same distance in seqno or Aseqno
-    int32_t distance = n - wrap(checkpoint, isn);
+
+    WrappingInt32 rlt = wrap(checkpoint, isn);
+    int32_t distance = n - rlt;
     int64_t Abs_seqno = checkpoint + distance;
     return Abs_seqno >= 0 ? Abs_seqno : Abs_seqno + (1UL << 32);
+
+    // uint64_t tmp = 0;
+    // uint64_t tmp1 = 0;
+    // if (n - isn < 0) {
+    //     tmp = uint64_t(n - isn + (1l << 32));
+    // } else {
+    //     tmp = uint64_t(n - isn);
+    // }
+    // if (tmp >= checkpoint)
+    //     return tmp;
+    // tmp |= ((checkpoint >> 32) << 32);
+    // while (tmp <= checkpoint)
+    //     tmp += (1ll << 32);
+    // tmp1 = tmp - (1ll << 32);
+    // return (checkpoint - tmp1 < tmp - checkpoint) ? tmp1 : tmp;
 }
