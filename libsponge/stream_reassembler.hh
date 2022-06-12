@@ -17,6 +17,7 @@ class StreamReassembler {
     size_t _capacity;    //!< The maximum number of bytes
     size_t _smallest_assembled_index = 0;
     size_t _smallest_temporty_index = 0;
+    size_t _unassembled_bytes = 0;
 
     struct datagram {
         string _data;
@@ -26,9 +27,15 @@ class StreamReassembler {
 
         // operator overflow
         bool operator>(const size_t &rhs) const { return this->index > rhs; }
+        bool operator>(const datagram &rhs) const { return this->index > rhs.index; }
         bool operator>=(const size_t &rhs) const { return this->index >= rhs; }
+        bool operator>=(const datagram &rhs) const { return this->index >= rhs.index; }
+        bool operator<=(const datagram &rhs) const { return this->index <= rhs.index; }
+
         bool operator<(const size_t &rhs) const { return this->index < rhs; }
+        bool operator<(const datagram &rhs) const { return this->index < rhs.index; }
         bool operator==(const size_t &rhs) const { return this->index == rhs; }
+        bool operator==(const datagram &rhs) const { return this->index == rhs.index; }
         size_t operator-(const datagram &rhs) const { return this->index - rhs.index; };
 
         datagram &operator=(datagram &rhs) {
@@ -78,7 +85,9 @@ class StreamReassembler {
     bool empty() const;
 
     void missing_middle_handler(datagram dg);
-    void overlap_handler(datagram new_dg);
+    bool overlap_handler(datagram new_dg);
+
+    size_t overlap_merger(datagram &dg1, datagram &dg2);
 };
 
 #endif  // SPONGE_LIBSPONGE_STREAM_REASSEMBLER_HH
