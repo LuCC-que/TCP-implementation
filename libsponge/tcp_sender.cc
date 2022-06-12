@@ -54,33 +54,18 @@ void TCPSender::fill_window() {
                                        static_cast<size_t>(reciever_logical_window_size),
                                        static_cast<size_t>(TCPConfig::MAX_PAYLOAD_SIZE)});
 
-            // if (stream_in().input_ended() && payload_size >= _stream.buffer_size() &&
-            //     payload_size + 1 > reciever_logical_window_size) {
-            //     return;
-            // }
             seg.payload() = _stream.read(payload_size);
-            if (_stream.eof() && payload_size + 1 <= reciever_logical_window_size) {
-                seg.header().fin = true;
-                _fin_sent = true;
-                --reciever_logical_window_size;
-            }
-
-            // if (!stream_in().input_ended()) {
-            //     seg.payload() = _stream.read(payload_size);
-            // }
-
-            // if (payload_size >= _stream.buffer_size()) {
-            //     size_t temp_p = payload_size + 1;
-            //     bool is_greater = temp_p > reciever_logical_window_size;
-            //     if (is_greater) {
-            //         return;  // reciever cannot contain this additional bit
-            //     }
-
-            //     seg.header().fin = true;
-            //     _fin_sent = true;
-            // }
+            bool contain_fin = _stream.eof() && payload_size + 1 <= reciever_logical_window_size;
+            seg.header().fin = contain_fin;
 
             send_TCPSegment(seg);
+            if (contain_fin) {
+                _fin_sent = true;
+                --reciever_logical_window_size;
+                ++_next_seqno;
+                ++_bytes_in_flight;
+            }
+
             _next_seqno += payload_size;
             reciever_logical_window_size -= payload_size;
 
@@ -94,7 +79,7 @@ void TCPSender::fill_window() {
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
-    reciever_window_size = ackno - _isn;
+    reciever_window_size = window_size;
     reciever_logical_window_size = window_size;
     // bool initial_case = _next_seqno == 1 && confirm_seqno == _isn;
 
@@ -102,21 +87,23 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
         return;
     }
 
-    bool invalid_cases = (ackno - confirm_seqno) > static_cast<int>(_bytes_in_flight) ||
-                         ackno - _isn <= static_cast<int>(front_outstanding_seg_size());
+    if (window_size == 0) {
+        reciever_logical_window_size++;
+    }
+
+    int size_c = static_cast<int>(front_outstanding_seg_size());
+
+    bool invalid_cases = (ackno - confirm_seqno) > static_cast<int>(_bytes_in_flight) || ackno - confirm_seqno < size_c;
 
     if (invalid_cases) {
         // wrong ack
         // ackno - confirm_seqno - _bytes_in_flight is the impossible gap
         // in between ackno and sent bytes
-        // reciever_logical_window_size = 0;
+
         reciever_logical_window_size = 0;
+
         return;
     }
-
-    // if (ackno - _isn < _outstanding_segments_out.front().payload().size()) {
-    //     return;
-    // }
 
     if (stream_in().input_ended()) {
         // input has stop
@@ -141,11 +128,6 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
         while (confirm_seqno < ackno) {
             confirm_outstanding_seg();
         }
-        // } else if (initial_case) {
-        //     confirm_outstanding_seg();
-        //     confirm_seqno = confirm_seqno + 1;
-        //     --_bytes_in_flight;
-        // }
     }
 }
 
@@ -181,7 +163,9 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
 
     } while (temp > 0 && it != first_sent);
 
-    _applying_retransmission_timeout *= 2;
+    if (reciever_window_size || _next_seqno == 1) {
+        _applying_retransmission_timeout *= 2;
+    }
 }
 
 void TCPSender::send_empty_segment() {}
@@ -213,9 +197,9 @@ void TCPSender::send_TCPSegment(TCPSegment &_seg, bool &&outstanding, bool &&res
 void TCPSender::confirm_outstanding_seg() {
     TCPSegment temp = _outstanding_segments_out.front();
     size_t payload_size = temp.payload().size();
-    confirm_seqno = confirm_seqno + temp.payload().size();
-    _bytes_in_flight -= temp.payload().size();
-    if (!payload_size && (temp.header().fin || temp.header().syn)) {
+    confirm_seqno = confirm_seqno + payload_size;
+    _bytes_in_flight -= payload_size;
+    if (temp.header().fin || temp.header().syn) {
         confirm_seqno = confirm_seqno + 1;
         --_bytes_in_flight;
     }
