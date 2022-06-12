@@ -15,7 +15,7 @@ class StreamReassembler {
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
-    size_t _smallest_assembled_index = 0;
+    size_t _next_assembling_index = 0;
     size_t _smallest_temporty_index = 0;
     size_t _unassembled_bytes = 0;
 
@@ -28,14 +28,18 @@ class StreamReassembler {
         // operator overflow
         bool operator>(const size_t &rhs) const { return this->index > rhs; }
         bool operator>(const datagram &rhs) const { return this->index > rhs.index; }
+
         bool operator>=(const size_t &rhs) const { return this->index >= rhs; }
+
         bool operator>=(const datagram &rhs) const { return this->index >= rhs.index; }
         bool operator<=(const datagram &rhs) const { return this->index <= rhs.index; }
 
         bool operator<(const size_t &rhs) const { return this->index < rhs; }
         bool operator<(const datagram &rhs) const { return this->index < rhs.index; }
+
         bool operator==(const size_t &rhs) const { return this->index == rhs; }
         bool operator==(const datagram &rhs) const { return this->index == rhs.index; }
+
         size_t operator-(const datagram &rhs) const { return this->index - rhs.index; };
 
         datagram &operator=(datagram &rhs) {
@@ -57,7 +61,7 @@ class StreamReassembler {
             return *this;
         }
     };
-    list<datagram> temporay_data_list;
+    list<datagram> temporarily_descrete_data_storage;
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
@@ -92,6 +96,7 @@ class StreamReassembler {
     bool empty() const;
 
     void missing_middle_handler(datagram dg);
+
     bool overlap_handler(datagram new_dg);
 
     size_t overlap_merger(datagram &dg1, datagram &dg2);
