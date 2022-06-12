@@ -7,7 +7,6 @@
 #include "wrapping_integers.hh"
 
 #include <functional>
-#include <list>
 #include <queue>
 
 //! \brief The "sender" part of a TCP implementation.
@@ -23,25 +22,26 @@ class TCPSender {
 
     //! outbound queue of segments that the TCPSender wants sent
     std::queue<TCPSegment> _segments_out{};
-    std::list<TCPSegment> _outstanding_segments_out{};
+    std::queue<TCPSegment> _outstanding_segments{};
 
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
-    unsigned int _applying_retransmission_timeout = 0;
+    unsigned int _applying_retransmission_timeout;
     size_t _last_tick_time = 0;
-    bool _fin_sent = false;
-    bool last_case_invalid = false;
+    bool _timing_begins = false;
+    uint16_t consecutive_retransmissions_ = 0;
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
-    WrappingInt32 confirm_seqno = wrap(0, _isn);
-    size_t reciever_window_size{0};
-    size_t reciever_logical_window_size{0};
-    size_t _bytes_in_flight = 0;
-    size_t _consecutive_retransmissions = 0;
+    uint64_t _confirmed_seqno{0};
+
+    // bool syn_ = false;
+    bool fin_sent = false;
+    uint64_t bytes_in_flight_ = 0;
+    uint16_t _receiver_window_size = 0;
 
   public:
     //! Initialize a TCPSender
@@ -61,6 +61,9 @@ class TCPSender {
     //! \brief A new acknowledgment was received
     void ack_received(const WrappingInt32 ackno, const uint16_t window_size);
 
+    //! \brief Generate an empty-payload segment (useful for creating empty ACK segments)
+    void send_empty_segment();
+
     //! \brief create and send segments to fill as much of the window as possible
     void fill_window();
 
@@ -74,17 +77,16 @@ class TCPSender {
     //! \brief How many sequence numbers are occupied by segments sent but not yet acknowledged?
     //! \note count is in "sequence space," i.e. SYN and FIN each count for one byte
     //! (see TCPSegment::length_in_sequence_space())
-    size_t bytes_in_flight() const { return _bytes_in_flight; }
+    size_t bytes_in_flight() const;
 
     //! \brief Number of consecutive retransmissions that have occurred in a row
-    unsigned int consecutive_retransmissions() const { return _consecutive_retransmissions; };
+    unsigned int consecutive_retransmissions() const;
 
     //! \brief TCPSegments that the TCPSender has enqueued for transmission.
     //! \note These must be dequeued and sent by the TCPConnection,
     //! which will need to fill in the fields that are set by the TCPReceiver
     //! (ackno and window size) before sending.
     std::queue<TCPSegment> &segments_out() { return _segments_out; }
-
     //!@}
 
     //! \name What is the next sequence number? (used for testing)
@@ -95,16 +97,6 @@ class TCPSender {
 
     //! \brief relative seqno for the next byte to be sent
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
-    //!@}
-
-    void send_TCPSegment(TCPSegment &_seg, const bool &&outstanding = false, const bool &&resend = false);
-
-    //! \brief Generate an empty-payload segment (useful for creating empty ACK segments)
-    void send_empty_segment();
-
-    void confirm_outstanding_seg();
-
-    void send_fin_seg();
 
     TCPSegment read_a_segment() {
         TCPSegment temp = _segments_out.front();
@@ -113,13 +105,33 @@ class TCPSender {
     }
 
     bool is_empty() const { return _segments_out.empty(); }
-    bool last_case_status() const { return last_case_invalid; }
 
-    size_t front_outstanding_seg_size() const {
-        if (!_outstanding_segments_out.size()) {
+    void send_tcp_segment(TCPSegment &tcp_segment) {
+        tcp_segment.header().seqno = wrap(_next_seqno, _isn);
+        _segments_out.push(tcp_segment);
+        _outstanding_segments.push(tcp_segment);
+        _next_seqno += tcp_segment.length_in_sequence_space();
+        bytes_in_flight_ += tcp_segment.length_in_sequence_space();
+        if (!_timing_begins) {
+            _timing_begins = true;
+            _last_tick_time = 0;
+        }
+    }
+
+    size_t front_seg_outstanding_ackno() const {
+        if (!_outstanding_segments.size()) {
             return 0;
         }
-        return _outstanding_segments_out.front().length_in_sequence_space();
+        TCPSegment front = _outstanding_segments.front();
+        return unwrap(front.header().seqno, _isn, _next_seqno) + front.length_in_sequence_space();
+    }
+
+    size_t front_seg_outstanding_size() const {
+        if (!_outstanding_segments.size()) {
+            return 0;
+        }
+
+        return _outstanding_segments.front().length_in_sequence_space();
     }
 };
 

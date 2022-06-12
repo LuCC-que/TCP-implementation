@@ -106,6 +106,8 @@ class StreamReassembler {
         }
         return temporarily_descrete_data_storage.front().index;
     };
+
+    bool input_ended() const { return _output.input_ended(); }
 };
 
 #endif  // SPONGE_LIBSPONGE_STREAM_REASSEMBLER_HH
