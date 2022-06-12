@@ -1,12 +1,16 @@
 #ifndef SPONGE_LIBSPONGE_NETWORK_INTERFACE_HH
 #define SPONGE_LIBSPONGE_NETWORK_INTERFACE_HH
 
+#include "arp_message.hh"
 #include "ethernet_frame.hh"
 #include "tcp_over_ip.hh"
 #include "tun.hh"
 
+#include <list>
+#include <map>
 #include <optional>
 #include <queue>
+#include <string.h>
 
 //! \brief A "network interface" that connects IP (the internet layer, or network layer)
 //! with Ethernet (the network access layer, or link layer).
@@ -40,6 +44,17 @@ class NetworkInterface {
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
 
+    struct ARP_Entry {
+        EthernetAddress eth_addr;
+        size_t ttl;
+    };
+
+    std::map<uint32_t, ARP_Entry> _arp_table{};
+    const size_t _arp_entry_default_ttl = 30 * 1000;
+    std::map<uint32_t, size_t> _waiting_arp_response_ip_addr{};
+    const size_t _arp_response_default_ttl = 5 * 1000;
+    std::list<std::pair<Address, InternetDatagram>> _waiting_arp_internet_datagrams{};
+
   public:
     //! \brief Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer) addresses
     NetworkInterface(const EthernetAddress &ethernet_address, const Address &ip_address);
@@ -62,6 +77,43 @@ class NetworkInterface {
 
     //! \brief Called periodically when time elapses
     void tick(const size_t ms_since_last_tick);
+
+    void make_ARP(ARPMessage &result,
+                  const uint16_t opcode,
+                  const EthernetAddress sender_ethernet_address,
+                  const uint32_t sender_ip_address,
+                  const EthernetAddress target_ethernet_address,
+                  const uint32_t target_ip_address) {
+        result.opcode = opcode;
+        result.sender_ethernet_address = sender_ethernet_address;
+        result.sender_ip_address = sender_ip_address;
+        result.target_ethernet_address = target_ethernet_address;
+        result.target_ip_address = target_ip_address;
+    }
+
+    void make_and_send_ETHframe(ARPMessage &arp) {
+        EthernetFrame eth;
+        eth.header() = {ETHERNET_BROADCAST, _ethernet_address, EthernetHeader::TYPE_ARP};
+        eth.payload() = arp.serialize();
+        _frames_out.push(eth);
+    }
+
+    // override
+    void make_and_send_ETHframe(const EthernetAddress &src_eth_addr, ARPMessage &arp) {
+        EthernetFrame eth;
+        eth.header() = {src_eth_addr, _ethernet_address, EthernetHeader::TYPE_ARP};
+        eth.payload() = arp.serialize();
+        _frames_out.push(eth);
+    }
+
+    // override
+    void make_and_send_ETHframe(const InternetDatagram &dgram,
+                                const std::map<uint32_t, NetworkInterface::ARP_Entry>::iterator &apr_entry) {
+        EthernetFrame eth;
+        eth.header() = {apr_entry->second.eth_addr, _ethernet_address, EthernetHeader::TYPE_IPv4};
+        eth.payload() = dgram.serialize();
+        _frames_out.push(eth);
+    }
 };
 
 #endif  // SPONGE_LIBSPONGE_NETWORK_INTERFACE_HH
