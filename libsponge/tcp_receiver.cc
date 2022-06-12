@@ -24,11 +24,14 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
         first_segment = false;
         ISN = seg_seqno;
     }
+
+    // if ((seg_seqno.raw_value() - ISN.raw_value()) + data.length() >= _capacity) {
+    //     return;
+    // }
     // bool not_first_seg_and_with_data = !first_segment && !data.length();
     uint64_t temp_abs_seqno = unwrap(seg_seqno, ISN, abs_seqno);
 
-    if (((abs_seqno == 1) && (temp_abs_seqno < abs_seqno)) ||
-        ((temp_abs_seqno > abs_seqno) && (temp_abs_seqno - abs_seqno) > _capacity)) {
+    if ((abs_seqno == 1) && (temp_abs_seqno < abs_seqno)) {
         // the syn have to take a index
         // the second seg cant not occupy that
         // otherwise it is invalid
@@ -36,6 +39,7 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     }
 
     size_t index = temp_abs_seqno > 0 ? temp_abs_seqno - 1 : temp_abs_seqno;
+
     _reassembler.push_substring(data, index, TCPHeader.fin);
 
     if (temp_abs_seqno != abs_seqno) {
