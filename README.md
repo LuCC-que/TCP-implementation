@@ -1,3 +1,26 @@
+
+
+
+
+# CS144 TCP/IP Implementation
+Welcome to my repo, this is a project comming from Standford computer network class, the project is divided into 7 labs, lab 0 is a simple web-getter application using build in TCP socket, then from lab1 - lab4 we will build a simple TCP protocal to replace the TCP socket in web-getter application, at this point the TCP protocal is already usable, the last two labs, 5 and 6, is building the link layer protocal and IP router table.
+
+# Demonstration
+Getting CS144 website!
+![alt text](https://github.com/LuCC-que/TCP-implementation/tree/master/img/Capture1.PNG?raw=true)
+
+Getting Queen's website!
+![alt text](https://github.com/LuCC-que/TCP-implementation/tree/master/img/Capture2.PNG?raw=true)
+
+Getting Standford website!
+![alt text](https://github.com/LuCC-que/TCP-implementation/tree/master/img/Capture3.PNG?raw=true)
+
+# Postscript
+There are still many limitations to this toy protocal, and performance is low, 
+
+
+
+
 For build prereqs, see [the CS144 VM setup instructions](https://web.stanford.edu/class/cs144/vm_howto).
 
 ## Sponge quickstart
