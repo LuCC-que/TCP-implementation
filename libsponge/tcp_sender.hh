@@ -27,7 +27,9 @@ class TCPSender {
 
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
-    unsigned int _last_sent_segment_time = 0;
+    unsigned int _applying_retransmission_timeout = 0;
+    size_t _last_tick_time = 0;
+    bool _fin_sent = false;
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
@@ -35,9 +37,10 @@ class TCPSender {
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
     WrappingInt32 confirm_seqno = wrap(0, _isn);
-    uint16_t reciever_window_size{0};
-    uint16_t reciever_logical_window_size{0};
+    size_t reciever_window_size{0};
+    size_t reciever_logical_window_size{0};
     size_t _bytes_in_flight = 0;
+    size_t _consecutive_retransmissions = 0;
 
   public:
     //! Initialize a TCPSender
@@ -76,7 +79,7 @@ class TCPSender {
     size_t bytes_in_flight() const { return _bytes_in_flight; }
 
     //! \brief Number of consecutive retransmissions that have occurred in a row
-    unsigned int consecutive_retransmissions() const;
+    unsigned int consecutive_retransmissions() const { return _consecutive_retransmissions; };
 
     //! \brief TCPSegments that the TCPSender has enqueued for transmission.
     //! \note These must be dequeued and sent by the TCPConnection,
@@ -96,9 +99,13 @@ class TCPSender {
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
 
-    void send_TCPSegment(TCPSegment &_seg, bool outstanding = false);
+    void send_TCPSegment(TCPSegment &_seg, bool &&outstanding = false, bool &&resend = false);
 
     void confirm_outstanding_seg();
+
+    void send_fin_seg();
+
+    size_t front_outstanding_seg_size() const { return _outstanding_segments_out.front().payload().size(); }
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
