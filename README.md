@@ -10,6 +10,7 @@ Getting CS144 website!
 ![alt text](https://github.com/LuCC-que/TCP-implementation/tree/master/img/Capture1.PNG?raw=true)
 
 Getting Queen's website!
+<img alt="WP Reliable Cookie Bar logo" src="[../media/wp-reliable-cookie-bar-logo.png?raw=true](https://github.com/LuCC-que/TCP-implementation/tree/master/img/Capture2.PNG?raw=true)" height="100" width="100" align="right">
 ![alt text](https://github.com/LuCC-que/TCP-implementation/tree/master/img/Capture2.PNG?raw=true)
 
 Getting Standford website!
