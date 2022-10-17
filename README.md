@@ -1,5 +1,22 @@
-For build prereqs, see [the CS144 VM setup instructions](https://web.stanford.edu/class/cs144/vm_howto).
+# CS144 TCP/IP Implementation
+### Welcome to my repo, this is a implementation of TCP/IP comming from Standford computer network class, the project is divided into 7 labs, lab 0 is a simple web-getter application using build in TCP socket, then from lab1 - lab4 we will build a simple TCP protocal to replace the TCP socket in web-getter application, at this point the TCP protocal is already usable, the last two labs, 5 and 6, is building the link layer protocal and IP router table.
 
+# Demonstration
+Getting CS144 website!
+![screen shot 1](./Capture1.PNG)
+
+Getting Queen's website!
+![screen shot 2](./Capture2.PNG)
+
+Getting Standford website!
+![screen shot 2](./Capture3.PNG)
+
+# Postscript
+### There are still many limitations to this toy protocal, and performance is low, CPU-limited throughput is 0.08 Gbit/s, CPU-limited throughput with reordering is 0.08 Gbit/s, there are some advanced C++ technique needs to be appiled
+
+----------------------------------------------------------------------
+## For build prereqs, see [the CS144 VM setup instructions](https://web.stanford.edu/class/cs144/vm_howto).
+----------------------------------------------------------------------
 ## Sponge quickstart
 
 To set up your build directory:
