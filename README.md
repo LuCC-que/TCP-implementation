@@ -1,6 +1,8 @@
 # CS144 TCP/IP Implementation
 ### Welcome to my repo, this is a implementation of TCP/IP comming from Standford computer network class, the project is divided into 7 labs, lab 0 is a simple web-getter application using build in TCP socket, then from lab1 - lab4 we will build a simple TCP protocal to replace the TCP socket in web-getter application, at this point the TCP protocal is already usable, the last two labs, 5 and 6, is building the link layer protocal and IP router table.
 
+# Q: Why your contribution is so little
+### A: well, back the may-june, 2022, I didn't use git well, if you click into commit message, you can see there are lager amount of commit with wrong value but my name is on it
 # Demonstration
 Getting CS144 website!
 ![screen shot 1](./Capture1.PNG)
